@@ -1,0 +1,26 @@
+{
+  "name": "zip-code-app",
+  "version": "1.0.0",
+  "description": "nuDoors CNI Matching Tool",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "setup-db": "node setup_database.js"
+  },
+  "keywords": [],
+  "author": "nuDoors",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.8.4",
+    "csv-parser": "^3.2.0",
+    "csv-writer": "^1.6.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.2",
+    "sqlite3": "^5.1.7" 
+
+  }
+
+}

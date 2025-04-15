@@ -1,0 +1,229 @@
+/* --- FILE: public/style.css --- */
+
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    padding: 20px;
+    max-width: 900px;
+    margin: 20px auto;
+    background-color: #f4f7f6;
+    color: #333;
+}
+
+h1 {
+    color: #005a78; /* A nuDoors-like blue */
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+p {
+    margin-bottom: 15px;
+}
+
+.upload-section {
+    background-color: #ffffff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    margin-bottom: 25px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+}
+
+label {
+    font-weight: bold;
+    color: #555;
+}
+
+input[type="file"] {
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 4px;
+    width: 100%;
+}
+
+/* Style the file input button */
+input[type="file"]::file-selector-button {
+    margin-right: 10px;
+    border: none;
+    background: #007bff;
+    padding: 8px 12px;
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+}
+
+input[type="file"]::file-selector-button:hover {
+    background: #0056b3;
+}
+
+
+button, .button {
+    background-color: #28a745; /* Green */
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    text-decoration: none; /* For <a> tags styled as buttons */
+    display: inline-block;
+    transition: background-color 0.2s ease-in-out;
+}
+
+button:hover, .button:hover {
+    background-color: #218838;
+}
+
+button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+#statusArea {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 5px;
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    min-height: 30px; /* Ensure it takes space even when empty */
+}
+
+#statusArea .processing {
+    color: #004085; /* Blue */
+    font-weight: bold;
+}
+#statusArea .success {
+    color: #155724; /* Green */
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    padding: 10px;
+}
+#statusArea .error {
+    color: #721c24; /* Red */
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    padding: 10px;
+}
+
+#resultsArea {
+    margin-top: 20px;
+    text-align: center; /* Center download button */
+}
+
+#downloadLink {
+    background-color: #007bff; /* Blue download button */
+}
+#downloadLink:hover {
+     background-color: #0056b3;
+}
+/* --- FILE: public/style.css (Additions) --- */
+
+/* ... (keep existing styles) ... */
+
+/* --- Styles for Single Lookup Section --- */
+.single-lookup-section {
+    background-color: #ffffff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    margin-bottom: 25px;
+}
+
+.single-lookup-section h2 {
+    color: #005a78;
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.lookup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.lookup-form label {
+    margin-bottom: 5px; /* Smaller margin for labels in this form */
+    font-weight: bold;
+    color: #555;
+}
+
+.lookup-form input[type="text"] {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+}
+
+.lookup-form button {
+    align-self: flex-start; /* Align button left */
+    width: auto; /* Don't make button full width */
+    background-color: #007bff; /* Blue lookup button */
+}
+.lookup-form button:hover {
+     background-color: #0056b3;
+}
+
+/* Style for the single result display area */
+#singleResultArea.result-box {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 5px;
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    min-height: 50px;
+}
+
+#singleResultArea h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #333;
+    font-size: 1.1em;
+}
+
+#singleResultArea ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#singleResultArea li {
+    margin-bottom: 8px;
+    padding-left: 15px;
+    position: relative;
+}
+#singleResultArea li::before {
+     content: '•'; /* Simple bullet */
+     color: #007bff;
+     position: absolute;
+     left: 0;
+     top: 1px;
+}
+
+
+#singleResultArea strong {
+    color: #555;
+}
+
+/* Status specific styles for single result box */
+#singleResultArea.processing p { color: #004085; font-weight: bold; }
+#singleResultArea.success { background-color: #d4edda; border-color: #c3e6cb; }
+#singleResultArea.success h4 { color: #155724; }
+#singleResultArea.success li::before { color: #155724; }
+#singleResultArea.error { background-color: #f8d7da; border-color: #f5c6cb;}
+#singleResultArea.error p { color: #721c24; font-weight: bold;}
+
+/* --- End Single Lookup Styles --- */

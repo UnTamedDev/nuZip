@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nuDoors CNI Matcher</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>nuDoors CNI Matching Tool</h1>
+
+    <div class="single-lookup-section">
+        <h2>Single Lead Lookup</h2>
+        <div class="lookup-form">
+             <!-- NEW: Lead Name Field -->
+            <div class="form-group">
+                 <label for="singleLeadNameInput">Lead Name:</label>
+                 <input type="text" id="singleLeadNameInput" placeholder="Enter Lead Name">
+            </div>
+            <!-- NEW: Lead ID Field (Optional) -->
+             <div class="form-group">
+                 <label for="singleLeadIdInput">Lead ID (Optional):</label>
+                 <input type="text" id="singleLeadIdInput" placeholder="Enter Lead Record ID">
+            </div>
+             <!-- Existing ZIP Field -->
+            <div class="form-group">
+                 <label for="singleZipInput">Lead ZIP Code:</label>
+                 <input type="text" id="singleZipInput" placeholder="Enter 5-digit ZIP" required> <!-- Added required -->
+            </div>
+            <!-- REMOVED CNI Lookup Key Input -->
+            <button id="lookupButton">Lookup CNI</button>
+        </div>
+        <div id="singleResultArea" class="result-box">
+            <!-- Single lookup results appear here -->
+            <p>Enter Lead Name and ZIP code above and click Lookup.</p>
+        </div>
+    </div>
+    <!-- ======================== -->
+    <!-- End Single Lead Lookup -->
+    <!-- ======================== -->
+
+
+    <div class="upload-section">
+        <h2>Bulk Process Leads CSV</h2>
+        <label for="csvFileInput">Select Leads CSV File:</label>
+        <input type="file" id="csvFileInput" accept=".csv">
+        <button id="processButton">Process File</button>
+    </div>
+
+    <div id="statusArea">
+        <!-- Bulk processing status messages will appear here -->
+    </div>
+
+    <div id="resultsArea">
+         <!-- Bulk download link will appear here -->
+         <a id="downloadLink" style="display: none;" class="button" download>Download Processed File</a>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

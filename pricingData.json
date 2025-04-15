@@ -1,0 +1,137 @@
+{
+  "doorPricing": {
+    "Shaker": {
+      "Painted": 65.40,
+      "Primed": 40.60,
+      "Unfinished": 22.00
+    },
+    "Slab": {
+      "Painted": 65.40,
+      "Primed": 40.60,
+      "Unfinished": 22.00
+    },
+    "Chamfer": {
+      "Painted": 66.32,
+      "Primed": 41.72,
+      "Unfinished": 22.85
+    },
+    "Savannah": {
+      "Painted": 66.32,
+      "Primed": 41.72,
+      "Unfinished": 22.85
+    },
+    "Beaded": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    },
+    "Stepped": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Ruth": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Maisie": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Mavis": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Dorothy": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Raised Panel": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Split Shaker": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Jean": {
+      "Painted": 69.32,
+      "Primed": 45.34,
+      "Unfinished": 25.60
+    }
+	"Nora": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Amelia": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Millie": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Glass Shaker": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Frances": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Alice": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Mabel": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Bessie": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Winona": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Eleanor": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	"Georgia": {
+      "Painted": 68.12,
+      "Primed": 43.89,
+      "Unfinished": 25.05
+    }
+	
+    // … add additional door styles as needed
+  },
+  "hingeCosts": {
+    "0-36": 13,
+    "36.01-60": 16.5,
+    "60.01-82": 20
+  },
+  "lazySusan": {
+    "price": 50
+  },
+  "customPaint": {
+    "price": 200
+  }
+}
