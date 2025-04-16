@@ -1,4 +1,4 @@
-// --- FILE: public/script.js (MODIFIED for Single Lookup) ---
+// --- FILE: public/script.js (REVISED for displaying full details) ---
 
 // Existing selectors for bulk processing
 const fileInput = document.getElementById('csvFileInput');
@@ -7,17 +7,15 @@ const statusArea = document.getElementById('statusArea'); // For bulk status
 const resultsArea = document.getElementById('resultsArea'); // For bulk download link
 const downloadLink = document.getElementById('downloadLink');
 
-// --- NEW: Selectors for single lookup ---
-const singleLeadNameInput = document.getElementById('singleLeadNameInput'); // NEW
-const singleLeadIdInput = document.getElementById('singleLeadIdInput');   // NEW
+// --- Selectors for single lookup ---
+const singleLeadNameInput = document.getElementById('singleLeadNameInput');
+const singleLeadIdInput = document.getElementById('singleLeadIdInput');
 const singleZipInput = document.getElementById('singleZipInput');
-// const singleCniLookupInput = document.getElementById('singleCniLookupInput'); // REMOVED
 const lookupButton = document.getElementById('lookupButton');
 const singleResultArea = document.getElementById('singleResultArea');
-// --- End NEW Selectors ---
+// --- End Selectors ---
 
-
-// Event Listener for Bulk Processing Button
+// --- Bulk Processing Logic (Keep as is) ---
 if (processButton && fileInput) {
     processButton.addEventListener('click', async () => {
         if (!fileInput.files || fileInput.files.length === 0) {
@@ -50,8 +48,11 @@ if (processButton && fileInput) {
             updateBulkStatus(`Processing complete! ${result.message || ''}`, 'success');
             if (result.downloadUrl) {
                  downloadLink.href = result.downloadUrl;
+                 // Use the original filename base for the download attribute
+                 const originalFilenameBase = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+                 downloadLink.setAttribute('download', `${originalFilenameBase}-processed.csv`);
                  downloadLink.style.display = 'inline-block';
-                 downloadLink.setAttribute('download', file.name.replace('.csv', '-processed.csv'));
+
             } else {
                  updateBulkStatus(`Processing complete, but no output file generated (perhaps no leads processed?).`, 'success');
             }
@@ -67,29 +68,29 @@ if (processButton && fileInput) {
 } else {
      console.error("Bulk processing button or file input not found.");
 }
+// --- End Bulk Processing Logic ---
 
 
-if (lookupButton && singleLeadNameInput && singleLeadIdInput && singleZipInput && singleResultArea) {
+// --- Single Lookup Logic ---
+if (lookupButton && singleLeadNameInput && singleZipInput && singleResultArea) { // Removed singleLeadIdInput from check as it's optional
     lookupButton.addEventListener('click', async () => {
-        const leadName = singleLeadNameInput.value.trim(); // Get Lead Name
-        const leadId = singleLeadIdInput.value.trim();     // Get Lead ID
-        const zip = singleZipInput.value.trim();           // Get ZIP
+        const leadName = singleLeadNameInput.value.trim();
+        const leadId = singleLeadIdInput.value.trim(); // Optional
+        const zip = singleZipInput.value.trim();
 
-        // --- Basic Validation ---
+        // Validation
         if (!zip) {
             displaySingleResult("Please enter a ZIP code.", "error");
             return;
         }
-         if (!leadName) { // Require name for context
+         if (!leadName) {
             displaySingleResult("Please enter the Lead Name.", "error");
             return;
          }
-        if (!/^\d{5}(-\d{4})?$/.test(zip)) {
+        if (!/^\d{5}$/.test(zip)) { // Strict 5-digit check
             displaySingleResult("Invalid ZIP code format. Please use 5 digits (e.g., 12345).", "error");
             return;
         }
-        // --- End Validation ---
-
 
         displaySingleResult("Looking up CNI...", "processing");
         lookupButton.disabled = true;
@@ -98,12 +99,7 @@ if (lookupButton && singleLeadNameInput && singleLeadIdInput && singleZipInput &
             const response = await fetch('/api/lookup-single', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // --- UPDATED: Send name, id, zip ---
-                body: JSON.stringify({
-                    leadName: leadName,
-                    leadId: leadId, // Send optional ID
-                    zip: zip
-                 })
+                body: JSON.stringify({ leadName: leadName, leadId: leadId, zip: zip })
             });
 
             const result = await response.json();
@@ -113,8 +109,7 @@ if (lookupButton && singleLeadNameInput && singleLeadIdInput && singleZipInput &
                 throw new Error(errorMessage);
             }
 
-            // Display formatted results (function updated below)
-            formatAndDisplaySingleResult(result.match);
+            formatAndDisplaySingleResult(result.match); // Display the detailed results
 
         } catch (error) {
              console.error("Single lookup error:", error);
@@ -126,54 +121,70 @@ if (lookupButton && singleLeadNameInput && singleLeadIdInput && singleZipInput &
 } else {
      console.error("Single lookup elements (inputs, button, or result area) not found.");
 }
-// --- End Single Lookup Listener ---
+// --- End Single Lookup Logic ---
 
 // --- Helper Functions ---
 
-// Update status for BULK processing
-// updateBulkStatus (Keep as is)
-function updateBulkStatus(message, type = 'info') { /* ... */ }
+// Updates status for BULK processing
+function updateBulkStatus(message, type = 'info') {
+    statusArea.textContent = ''; // Clear previous
+    const statusDiv = document.createElement('div');
+    statusDiv.textContent = message;
+    statusDiv.className = type; // 'processing', 'success', or 'error'
+    statusArea.appendChild(statusDiv);
+}
 
-// displaySingleResult (Keep as is)
-function displaySingleResult(message, type = 'info') { /* ... */ }
+// Updates status for SINGLE lookup
+function displaySingleResult(message, type = 'info') {
+     if (singleResultArea) {
+        singleResultArea.innerHTML = `<p class="${type}">${escapeHTML(message)}</p>`;
+        singleResultArea.className = `result-box ${type}`; // Add type class for styling
+     }
+ }
 
-// formatAndDisplaySingleResult (MODIFIED to include Lead Name/ID)
+// Formats and displays the SINGLE lookup result with ALL details
 function formatAndDisplaySingleResult(match) {
     if (!match) {
         displaySingleResult("No match data received from server.", "error");
         return;
     }
 
-    // Use info passed back from server for context
     const leadName = match.leadName || '(Name not provided)';
-    const leadId = match.leadId || '(ID not provided)';
     const leadZip = match.zip; // Original zip requested
 
     let html = `<h4>Lookup Result for: ${escapeHTML(leadName)}</h4>`;
-    // Optional: Display Lead ID if needed
-    // html += `<p style="font-size: 0.9em; color: #666;">Lead ID: ${escapeHTML(leadId)}</p>`;
     html += `<p style="font-size: 0.9em; color: #666;">Requested ZIP: ${escapeHTML(leadZip)}</p>`;
-    html += `<hr style="margin: 10px 0; border: none; border-top: 1px solid #eee;">`; // Separator
+    html += `<hr style="margin: 10px 0; border: none; border-top: 1px solid #eee;">`;
 
     html += `<ul>`;
     html += `<li><strong>Match Type:</strong> ${escapeHTML(match.match_type || 'N/A')}</li>`;
 
-    if (match.matched_zip) {
-        html += `<li><strong>Matched CNI:</strong> ${escapeHTML(match.locationName)} (${escapeHTML(match.matched_zip)})</li>`;
+    if (match.location_name && match.matched_zip) {
+        html += `<li><strong>Matched CNI:</strong> ${escapeHTML(match.location_name)}</li>`;
+        html += `<li><strong>Matched ZIP:</strong> ${escapeHTML(match.matched_zip)}</li>`;
+        html += `<li><strong>State:</strong> ${escapeHTML(match.state || 'N/A')}</li>`;
+        html += `<li><strong>Email:</strong> ${escapeHTML(match.email || 'N/A')}</li>`;
+        html += `<li><strong>CNI Status:</strong> ${escapeHTML(match.cni_status || 'N/A')}</li>`;
+        html += `<li><strong>Source:</strong> ${escapeHTML(match.source || 'N/A')}</li>`;
+        // Optionally display coordinates if needed
+        // html += `<li><strong>Coords:</strong> Lat ${match.latitude?.toFixed(4) || 'N/A'}, Lon ${match.longitude?.toFixed(4) || 'N/A'}</li>`;
     } else {
         html += `<li><strong>Matched CNI:</strong> None Found</li>`;
     }
 
-    if (match.match_type !== 'direct' && match.cni_distance_miles) {
-         html += `<li><strong>Driving Distance:</strong> ~${escapeHTML(match.cni_distance_miles)} miles</li>`; // Added ~ indicator
-    } else if (match.match_type === 'direct') {
+    // Display distance information based on match type
+    if (match.match_type === 'direct') {
          html += `<li><strong>Distance:</strong> 0 miles (Direct Match)</li>`;
-    } else if (match.match_type === 'no_driving_distance' && match.cni_distance_miles) {
-        html += `<li><strong>Straight-Line Distance:</strong> ~${escapeHTML(match.cni_distance_miles)} miles (Driving route not found)</li>`;
+    } else if (match.match_type !== 'none' && match.match_type !== 'geocode_failed' && match.match_type !== 'invalid_lead_zip' && match.cni_distance_miles !== null) {
+         const distanceLabel = match.match_type === 'no_driving_distance' ? 'Straight-Line Distance' : 'Driving Distance';
+         const distanceSuffix = match.match_type === 'no_driving_distance' ? ' (Driving route not found)' : '';
+         html += `<li><strong>${distanceLabel}:</strong> ~${escapeHTML(match.cni_distance_miles)} miles${distanceSuffix}</li>`;
+         // Optionally show text/duration from Google API if available and not straight-line
+         if (match.distance_text && match.duration_text && match.match_type !== 'no_driving_distance') {
+              html += `<li><strong>Route Details:</strong> ${escapeHTML(match.distance_text)}, ${escapeHTML(match.duration_text)}</li>`;
+         }
     }
 
-    // Email lookup was removed from core match logic for now
-    // html += `<li><strong>Contact Email:</strong> ${escapeHTML(match.cni_email || 'Not Found')}</li>`;
 
     html += `</ul>`;
 
@@ -183,11 +194,12 @@ function formatAndDisplaySingleResult(match) {
     }
 }
 
+
 // Simple HTML escape helper
 function escapeHTML(str) {
      if (str === null || str === undefined) return '';
      const div = document.createElement('div');
-     div.textContent = str;
+     div.textContent = str.toString(); // Ensure it's a string
      return div.innerHTML;
  }
 

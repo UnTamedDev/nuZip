@@ -1,28 +1,28 @@
-// --- FILE: setup_database.js ---
+// --- FILE: setup_database.js (REVISED) ---
 
 require('dotenv').config(); // Load environment variables from .env
-const sqlite3 = require('sqlite3').verbose(); // Use verbose mode for detailed logs during setup
+const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
-const XLSX = require('xlsx');
 const csv = require('csv-parser');
 const axios = require('axios');
 
 // --- Configuration ---
-const DB_FILE = path.join(__dirname, 'cni_database.db'); // Database file name
-const LOCATIONS_EXCEL_FILE = path.join(__dirname, 'All ZIPcodes - Main DB.xlsx');
-const CONTACTS_CSV_FILE = path.join(__dirname, 'CNI_Screening.csv'); // ADJUST FILENAME IF NEEDED
+const DB_FILE = path.join(__dirname, 'cni_database.db');
+const CNI_MASTER_CSV_FILE = path.join(__dirname, 'input_file_0.csv'); // Use the uploaded file name
 const GEOCODE_API_URL_TEMPLATE = 'https://maps.googleapis.com/maps/api/geocode/json?address={ZIPCODE}&key={API_KEY}';
 const API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const RATE_LIMIT_DELAY_MS = 150; // Delay between geocoding requests (adjust if needed)
+const INVALID_ZIPS_TO_SKIP = ['0', '00000']; // Zips to ignore
 
-// --- Column Name Assumptions (ADJUST IF YOUR FILES ARE DIFFERENT) ---
-const CNI_LOCATION_ZIP_COL = 'Zip Code';         // Column name for ZIP in Excel file
-const CNI_LOCATION_NAME_COL = 'CNI Zipcodes Name'; // Column name for CNI name in Excel file
-const CNI_CONTACT_LOOKUP_COL = 'CNI lookup';// Column name for the key in CNI_Screening.csv
-const CNI_CONTACT_EMAIL_COL = 'Email';     // Column name for the email in CNI_Screening.csv
+// --- CSV Column Name Assumptions (Match input_file_0.csv) ---
+const COL_LOCATION_NAME = 'Location name';
+const COL_ZIP_CODE = 'Zip Code';
+const COL_STATE = 'State';
+const COL_EMAIL = 'Email';
+const COL_CNI_STATUS = 'CNI Status';
+const COL_SOURCE = 'Source';
 // --- End Configuration ---
-
 
 if (!API_KEY) {
     console.error("FATAL ERROR: GOOGLE_MAPS_API_KEY not found in .env file.");
@@ -32,29 +32,52 @@ if (!API_KEY) {
 // Helper function for delays
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Helper function to format ZIP codes to 5 digits with leading zeros
+function formatZipCode(zip) {
+    if (zip === null || zip === undefined) return null;
+    let zipStr = zip.toString().trim();
+    // Handle potential non-numeric input or empty strings after trim
+    if (!/^\d+$/.test(zipStr) || zipStr === '') return null;
+    // Pad with leading zeros if necessary
+    return zipStr.padStart(5, '0');
+}
+
+
 // Function to geocode a single ZIP code
 async function geocodeZip(zip) {
-    if (!zip) return null;
-    console.log(`  Geocoding ZIP: ${zip}...`);
+    const formattedZip = formatZipCode(zip);
+    if (!formattedZip || INVALID_ZIPS_TO_SKIP.includes(formattedZip)) {
+        console.warn(`  Skipping geocode for invalid/ignored ZIP: ${zip} (Formatted: ${formattedZip})`);
+        return null;
+    }
+    console.log(`  Geocoding formatted ZIP: ${formattedZip}...`);
     const apiUrl = GEOCODE_API_URL_TEMPLATE
-        .replace('{ZIPCODE}', encodeURIComponent(zip))
+        .replace('{ZIPCODE}', encodeURIComponent(formattedZip)) // Use formatted zip for API
         .replace('{API_KEY}', API_KEY);
 
     try {
-        const response = await axios.get(apiUrl);
+        const response = await axios.get(apiUrl, { timeout: 7000 }); // Increased timeout slightly
         if (response.data && response.data.status === 'OK' && response.data.results.length > 0) {
             const location = response.data.results[0].geometry.location;
             console.log(`    -> Success: Lat=${location.lat}, Lng=${location.lng}`);
             return { lat: location.lat, lng: location.lng };
         } else {
-            console.warn(`    -> Failed: Status=${response.data.status} for ZIP ${zip}. Response:`, response.data);
+            console.warn(`    -> Geocode Failed: Status=${response.data?.status || 'N/A'} for ZIP ${formattedZip}.`);
+            // Log more details for specific error types
+            if (response.data?.status === 'ZERO_RESULTS') {
+                 console.warn(`       -> ZERO_RESULTS indicates the ZIP might not be valid or geocodable.`);
+            } else if (response.data?.error_message) {
+                 console.warn(`       -> API Error Message: ${response.data.error_message}`);
+            }
             return null;
         }
     } catch (error) {
-        console.error(`    -> Error geocoding ZIP ${zip}:`, error.message);
+        console.error(`    -> Error geocoding ZIP ${formattedZip}:`, error.message);
         if (error.response) {
             console.error("      Response Status:", error.response.status);
             console.error("      Response Data:", error.response.data);
+        } else if (error.request) {
+             console.error("      No response received (timeout or network issue).");
         }
         return null;
     }
@@ -67,12 +90,17 @@ async function setupDatabase() {
     // Delete existing DB file if it exists to start fresh
     if (fs.existsSync(DB_FILE)) {
         console.log("Existing database file found. Deleting for fresh setup...");
-        fs.unlinkSync(DB_FILE);
-        console.log("Existing database file deleted.");
+        try {
+            fs.unlinkSync(DB_FILE);
+            console.log("Existing database file deleted.");
+        } catch (unlinkErr) {
+            console.error(`Error deleting existing database file: ${unlinkErr.message}`);
+            console.error("Please close any applications using the database and try again.");
+            return; // Stop execution if DB can't be deleted
+        }
     }
 
-
-    // Connect to SQLite database (creates the file if it doesn't exist)
+    // Connect to SQLite database (creates the file)
     const db = new sqlite3.Database(DB_FILE, (err) => {
         if (err) {
             console.error("Error opening database:", err.message);
@@ -81,158 +109,166 @@ async function setupDatabase() {
         console.log('Connected to the SQLite database.');
     });
 
-    // Use serialize to ensure table creation happens before insertion
+    // Use serialize to ensure sequential execution
     db.serialize(async () => {
-        console.log("Creating tables if they don't exist...");
-        // Create cni_locations table
-        db.run(`
-            CREATE TABLE IF NOT EXISTS cni_locations (
-                zip TEXT PRIMARY KEY,
-                locationName TEXT,
-                latitude REAL,
-                longitude REAL
-            )
-        `, (err) => {
-            if (err) return console.error("Error creating cni_locations table:", err.message);
-            console.log("Table 'cni_locations' created or already exists.");
-        });
-
-        // Create cni_contacts table
-        db.run(`
-            CREATE TABLE IF NOT EXISTS cni_contacts (
-                cni_lookup_key TEXT PRIMARY KEY,
-                email TEXT
-            )
-        `, (err) => {
-            if (err) return console.error("Error creating cni_contacts table:", err.message);
-            console.log("Table 'cni_contacts' created or already exists.");
-        });
-
-        // --- Process CNI Locations (Excel) ---
         try {
-            console.log(`\nProcessing CNI Locations from: ${LOCATIONS_EXCEL_FILE}...`);
-            if (!fs.existsSync(LOCATIONS_EXCEL_FILE)) {
-                 throw new Error(`Excel file not found at ${LOCATIONS_EXCEL_FILE}`);
+            console.log("Dropping old tables if they exist...");
+            await new Promise((resolve, reject) => {
+                 db.run(`DROP TABLE IF EXISTS cni_locations`, (err) => { if(err) reject(err); else resolve(); });
+            });
+             await new Promise((resolve, reject) => {
+                 db.run(`DROP TABLE IF EXISTS cni_contacts`, (err) => { if(err) reject(err); else resolve(); });
+            });
+             await new Promise((resolve, reject) => {
+                 db.run(`DROP TABLE IF EXISTS cni_data`, (err) => { if(err) reject(err); else resolve(); }); // Drop new table too if re-running
+            });
+            console.log("Old tables dropped (if they existed).");
+
+            console.log("Creating new 'cni_data' table...");
+            await new Promise((resolve, reject) => {
+                db.run(`
+                    CREATE TABLE IF NOT EXISTS cni_data (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        location_name TEXT NOT NULL,
+                        zip TEXT NOT NULL,
+                        state TEXT,
+                        email TEXT,
+                        cni_status TEXT,
+                        source TEXT,
+                        latitude REAL,
+                        longitude REAL,
+                        UNIQUE(location_name, zip) -- Ensures unique combination
+                    )
+                `, (err) => {
+                    if (err) { console.error("Error creating cni_data table:", err.message); reject(err); }
+                    else { console.log("Table 'cni_data' created successfully."); resolve(); }
+                });
+            });
+
+            // Add index for faster zip lookups
+            await new Promise((resolve, reject) => {
+                db.run(`CREATE INDEX IF NOT EXISTS idx_zip ON cni_data (zip)`, (err) => {
+                     if (err) { console.warn("Could not create index on zip:", err.message); } // Warn but continue
+                     else { console.log("Index on 'zip' column created."); }
+                     resolve(); // Resolve regardless of index creation success
+                });
+            });
+
+            // --- Process CNI Master Data (CSV) ---
+            console.log(`\nProcessing CNI Master Data from: ${CNI_MASTER_CSV_FILE}...`);
+            if (!fs.existsSync(CNI_MASTER_CSV_FILE)) {
+                 throw new Error(`CSV file not found at ${CNI_MASTER_CSV_FILE}`);
             }
-            const workbook = XLSX.readFile(LOCATIONS_EXCEL_FILE);
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const locationsData = XLSX.utils.sheet_to_json(worksheet);
-            console.log(`Found ${locationsData.length} rows in Excel.`);
 
-            // Prepare insert statement
-            const stmtLocations = db.prepare(`
-                INSERT OR IGNORE INTO cni_locations (zip, locationName, latitude, longitude)
-                VALUES (?, ?, ?, ?)
-            `); // Use OR IGNORE to skip duplicate ZIPs gracefully
+            // Use a transaction for potentially faster bulk inserts
+            await new Promise((resolve, reject) => db.run('BEGIN TRANSACTION', (err) => err ? reject(err) : resolve()));
 
+            const stmtInsert = db.prepare(`
+                INSERT OR IGNORE INTO cni_data
+                    (location_name, zip, state, email, cni_status, source, latitude, longitude)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `); // Use OR IGNORE based on UNIQUE constraint
+
+            let rowCount = 0;
             let processedCount = 0;
-            for (const location of locationsData) {
-                const zip = location[CNI_LOCATION_ZIP_COL]?.toString().trim();
-                const locationName = location[CNI_LOCATION_NAME_COL]?.toString().trim();
+            let skippedCount = 0;
+            let geocodeFailCount = 0;
 
-                if (!zip) {
-                    console.warn("Skipping row due to missing ZIP:", location);
+            const stream = fs.createReadStream(CNI_MASTER_CSV_FILE).pipe(csv({
+                 mapHeaders: ({ header }) => header.trim() // Trim headers
+            }));
+
+            for await (const row of stream) {
+                rowCount++;
+                const locationName = row[COL_LOCATION_NAME]?.trim();
+                const originalZip = row[COL_ZIP_CODE]; // Keep original for formatting
+                const state = row[COL_STATE]?.trim() || null;
+                const email = row[COL_EMAIL]?.trim() || null;
+                const cniStatus = row[COL_CNI_STATUS]?.trim() || null;
+                const source = row[COL_SOURCE]?.trim() || null;
+
+                // Basic validation
+                if (!locationName) {
+                    console.warn(`Skipping row ${rowCount} due to missing Location Name.`);
+                    skippedCount++;
                     continue;
                 }
 
-                // Geocode the ZIP
-                const coords = await geocodeZip(zip);
+                const formattedZip = formatZipCode(originalZip);
+                if (!formattedZip || INVALID_ZIPS_TO_SKIP.includes(formattedZip)) {
+                    console.warn(`Skipping row ${rowCount} for CNI '${locationName}' due to invalid/ignored ZIP: '${originalZip}' (Formatted: ${formattedZip})`);
+                    skippedCount++;
+                    continue;
+                }
+
+                // Geocode the valid ZIP
+                const coords = await geocodeZip(formattedZip);
                 await sleep(RATE_LIMIT_DELAY_MS); // IMPORTANT: Respect rate limits
 
+                if (!coords) {
+                    geocodeFailCount++;
+                    console.warn(` -> Failed to geocode ZIP ${formattedZip} for CNI '${locationName}'. Inserting without coordinates.`);
+                }
+
                 // Insert into database
-                stmtLocations.run(
-                    zip,
-                    locationName || null, // Handle potentially missing names
-                    coords ? coords.lat : null,
-                    coords ? coords.lng : null,
-                    (err) => {
-                        if (err) console.error(`Error inserting location ZIP ${zip}:`, err.message);
-                    }
-                );
-
-                processedCount++;
-                if (processedCount % 50 === 0) {
-                    console.log(`  Processed ${processedCount} of ${locationsData.length} locations...`);
-                }
-            }
-
-            // Finalize the statement after the loop
-            await new Promise((resolve, reject) => {
-                 stmtLocations.finalize((err) => {
-                    if (err) reject(err);
-                    else resolve();
+                await new Promise((resolve, reject) => {
+                    stmtInsert.run(
+                        locationName,
+                        formattedZip,
+                        state,
+                        email,
+                        cniStatus,
+                        source,
+                        coords ? coords.lat : null,
+                        coords ? coords.lng : null,
+                        function(err) { // Use function() to access this.changes
+                            if (err) {
+                                console.error(`Error inserting row ${rowCount} (Zip ${formattedZip}, Name ${locationName}):`, err.message);
+                                // Optionally reject(err) here if one error should stop everything, but IGNORE should handle most issues.
+                            } else {
+                                // this.changes tells if a row was actually inserted (1) or ignored (0)
+                                if (this.changes > 0) {
+                                    processedCount++;
+                                } else {
+                                    // Log if ignored, might indicate unexpected duplicate pairs if UNIQUE constraint was hit
+                                    // console.warn(`  Row ${rowCount} (Zip ${formattedZip}, Name ${locationName}) ignored, likely duplicate.`);
+                                }
+                            }
+                             resolve(); // Resolve whether inserted or ignored
+                        }
+                    );
                 });
-            });
-            console.log(`Finished processing ${processedCount} CNI locations.`);
 
-        } catch (error) {
-            console.error("\n--- ERROR PROCESSING CNI LOCATIONS ---");
-            console.error(error);
-            console.error("--------------------------------------");
-        }
 
-        // --- Process CNI Contacts (CSV) ---
-        try {
-             console.log(`\nProcessing CNI Contacts from: ${CONTACTS_CSV_FILE}...`);
-             if (!fs.existsSync(CONTACTS_CSV_FILE)) {
-                  throw new Error(`CSV file not found at ${CONTACTS_CSV_FILE}`);
-             }
-
-             const contactsStream = fs.createReadStream(CONTACTS_CSV_FILE)
-                .pipe(csv({
-                    mapHeaders: ({ header }) => header.trim() // Trim headers just in case
-                }));
-
-             const stmtContacts = db.prepare(`
-                INSERT OR REPLACE INTO cni_contacts (cni_lookup_key, email)
-                VALUES (?, ?)
-             `); // Use OR REPLACE if you want updates for existing keys
-
-            let contactCount = 0;
-             contactsStream.on('data', (row) => {
-                const lookupKey = row[CNI_CONTACT_LOOKUP_COL];
-                const email = row[CNI_CONTACT_EMAIL_COL];
-
-                if (lookupKey && email) { // Basic validation
-                    stmtContacts.run(lookupKey.trim(), email.trim(), (err) => {
-                       if (err) console.error(`Error inserting contact key ${lookupKey}:`, err.message);
-                       else contactCount++;
-                    });
-                } else {
-                    console.warn("Skipping contact row due to missing key or email:", row);
+                if (rowCount % 100 === 0) {
+                    console.log(`  Checked ${rowCount} rows from CSV. Inserted/Processed: ${processedCount}, Skipped Invalid: ${skippedCount}, Geocode Fails: ${geocodeFailCount}...`);
                 }
-             });
+            } // End for await loop
 
-             await new Promise((resolve, reject) => {
-                 contactsStream.on('end', () => {
-                     stmtContacts.finalize((err) => {
-                         if (err) reject(err);
-                         else {
-                              console.log(`Finished processing ${contactCount} CNI contacts.`);
-                              resolve();
-                         }
-                     });
-                 });
-                 contactsStream.on('error', (err) => {
-                     console.error("Error reading contacts CSV stream:", err);
-                     // Attempt to finalize anyway? Maybe not safe.
-                     stmtContacts.finalize(); // Finalize even on error?
-                     reject(err);
-                 });
-             });
+            // Finalize the statement and commit transaction
+             await new Promise((resolve, reject) => stmtInsert.finalize(err => err ? reject(err) : resolve()));
+             await new Promise((resolve, reject) => db.run('COMMIT', (err) => err ? reject(err) : resolve()));
+
+            console.log(`\n--- CNI Master Data Processing Summary ---`);
+            console.log(`Total rows read from CSV: ${rowCount}`);
+            console.log(`Rows successfully processed & inserted (or ignored as duplicate): ${processedCount}`);
+            console.log(`Rows skipped due to invalid ZIP/missing name: ${skippedCount}`);
+            console.log(`Geocoding failures (inserted without coords): ${geocodeFailCount}`);
+            console.log(`------------------------------------------`);
 
         } catch (error) {
-            console.error("\n--- ERROR PROCESSING CNI CONTACTS ---");
+            console.error("\n--- FATAL ERROR DURING DATABASE SETUP ---");
             console.error(error);
-            console.error("-------------------------------------");
+            console.error("----------------------------------------");
+            // Attempt to rollback transaction on error
+             await new Promise((resolve) => db.run('ROLLBACK', () => resolve())); // Ignore rollback error
         } finally {
-            // Close the database connection when all done
+            // Close the database connection
             db.close((err) => {
                 if (err) {
                     return console.error("Error closing database:", err.message);
                 }
-                console.log('\nDatabase connection closed. Setup complete.');
+                console.log('\nDatabase connection closed. Setup process finished.');
             });
         }
     }); // End db.serialize
